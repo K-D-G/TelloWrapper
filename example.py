@@ -1,6 +1,5 @@
 from tello import Tello
 import cv2
-import time
 
 def main():
     drone=Tello()
