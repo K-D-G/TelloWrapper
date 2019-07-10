@@ -7,7 +7,6 @@ import cv2
 #Make sure we can get the video stream and add a way (if there isn't one) of accessing
 #it
 #Do tests on all of the functions
-#Upload to github
 
 #Help from: https://ubuntuforums.org/showthread.php?t=2394609
 import sys, termios, tty, os, time
@@ -26,7 +25,7 @@ class Tello:
         self.UDP_IP='192.168.10.1'
         self.UDP_PORT_COMMAND=8889
         self.UDP_PORT_STATE=8890
-        self.UDP_IP_VIDEO='0.0.0.0'
+        self.UDP_IP_VIDEO='192.168.10.1'
         self.UDP_PORT_VIDEO=11111
 
         self.TIME_OUT=0.5 #seconds
@@ -64,6 +63,8 @@ class Tello:
         self.thread_override.start()
 
         self.send_command_return('command')
+        self.streamoff() #The feed could still be on so turn it off and then turn it on
+        self.streamon()
 
 
     def run_udp_receiver(self):
@@ -71,6 +72,7 @@ class Tello:
             try:
                 self.response, _=self.client_socket.recvfrom(1024)
             except Exception as e:
+                print('Error:')
                 print(e)
                 break
 
@@ -108,11 +110,14 @@ class Tello:
                     self.yaw_velocity=0
 
                 if override=='q': #Up
-                    self.up_down_velocity=-int(self.drone_speed*self.override_speed)
-                elif override=='e': #Down
                     self.up_down_velocity=int(self.drone_speed*self.override_speed)
+                elif override=='e': #Down
+                    self.up_down_velocity=-int(self.drone_speed*self.override_speed)
                 else:
                     self.up_down_velocity=0
+
+                if override=='f':
+                    self.flip('f')
 
                 if override=='t': #Takeoff
                     self.takeoff()
@@ -125,7 +130,7 @@ class Tello:
             self.send_rc_control(self.left_right_velocity, self.forward_backward_velocity, self.up_down_velocity, self.yaw_velocity)
 
     def get_udp_video_address(self):
-        return 'udp://@'+self.UDP_IP_VIDEO+':'+str(self.UDP_PORT_VIDEO)
+        return 'udp://@'+self.UDP_IP_VIDEO+':'+str(self.UDP_PORT_VIDEO)+'?overrun_nonfatal=1&fifo_size=50000000'
 
     def get_video_capture(self):
         if self.capture is None:
@@ -271,14 +276,14 @@ class BackgroundFrameRead:
 
         self.grabbed, self.frame=self.capture.read()
         self.stopped=False
-    def start(seld):
-        Thread(target=self.update_frame, args=())
+    def start(self):
+        Thread(target=self.update_frame, args=()).start()
         return self
     def update_frame(self):
         while not self.stopped:
             if not self.grabbed or not self.capture.isOpened():
                 self.stop()
             else:
-                self.grabbed, self.frame=self.capture.read()
+                (self.grabbed, self.frame)=self.capture.read()
     def stop(self):
         self.stopped=True
