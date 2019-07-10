@@ -4,8 +4,7 @@ import threading
 from threading import Thread
 import cv2
 
-#Make sure we can get the video stream and add a way (if there isn't one) of accessing
-#it
+#Make sure we can get the video stream and add a way (if there isn't one) of accessing it
 #Do tests on all of the functions
 
 #Help from: https://ubuntuforums.org/showthread.php?t=2394609
