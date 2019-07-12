@@ -4,9 +4,6 @@ import threading
 from threading import Thread
 import cv2
 
-#Make sure we can get the video stream and add a way (if there isn't one) of accessing it
-#Do tests on all of the functions
-
 #Help from: https://ubuntuforums.org/showthread.php?t=2394609
 import sys, termios, tty, os, time
 def getch():
@@ -61,10 +58,14 @@ class Tello:
         self.thread_override.daemon=True
         self.thread_override.start()
 
+        #cv2.redirectError(self.deal_with_error)
+
         self.send_command_return('command')
         self.streamoff() #The feed could still be on so turn it off and then turn it on
         self.streamon()
 
+    #def deal_with_error(self, *args, **kwargs):
+    #    pass
 
     def run_udp_receiver(self):
         while True:
@@ -76,6 +77,7 @@ class Tello:
                 break
 
     def override_check(self):
+        arrow_key=None
         while True:
             override=getch()
             if override==chr(27):
@@ -87,6 +89,19 @@ class Tello:
                     print('User override')
 
             if self.override:
+                #Check if arrow keys are pressed
+                if override=="\033":
+                    getch()
+                    key=getch()
+                    if key=='A':
+                        arrow_key='Up'
+                    elif key=='B':
+                        arrow_key='Down'
+                    elif key=='C':
+                        arrow_key='Right'
+                    elif key=='D':
+                        arrow_key='Left'
+
                 if override=='w': #Forward
                     self.forward_backward_velocity=int(self.drone_speed*self.override_speed)
                 elif override=='s': #Backward
@@ -115,8 +130,18 @@ class Tello:
                 else:
                     self.up_down_velocity=0
 
-                if override=='f':
-                    self.flip('f')
+                if override=='f': #Flip
+                    if arrow_key:
+                        if arrow_key=='Up':
+                            self.flip('f')
+                        elif arrow_key=='Down':
+                            self.flip('b')
+                        elif arrow_key=='Left':
+                            self.flip('l')
+                        elif arrow_key=='Right':
+                            self.flip('r')
+                    else:
+                        self.flip('f')
 
                 if override=='t': #Takeoff
                     self.takeoff()
@@ -124,7 +149,13 @@ class Tello:
                 if override=='l': #Land
                     self.land()
 
+                if override=='p': #Cut off all motors
+                    self.emergency()
+
+                arrow_key=None
+
     def update(self):
+        cv2.waitKey(1)&0xff
         if self.can_rc:
             self.send_rc_control(self.left_right_velocity, self.forward_backward_velocity, self.up_down_velocity, self.yaw_velocity)
 
@@ -150,8 +181,9 @@ class Tello:
             self.streamoff()
         if self.background_frame_read is not None:
             self.background_frame_read.stop()
-        if self.capture is not Nonr:
-            self.cap.release()
+        if self.capture is not None:
+            self.capture.release()
+        cv2.destroyAllWindows()
 
     def send_command_without_return(self, command):
         if not isinstance(command, str):
@@ -180,6 +212,7 @@ class Tello:
         response=self.response
         self.response=None
         if response.decode('utf-8')=='error' and self.log:
+            #print(f'Command {command} returned ERROR, please take control')
             print(f'Command {command} returned ERROR, please take control')
 
         return response.decode('utf-8')
@@ -240,7 +273,7 @@ class Tello:
             self.last_rc_control_sent=int(time.time()*1000)
             return self.send_command_without_return('rc %s %s %s %s'%(left_right_velocity, forward_backward_velocity, up_down_velocity, yaw_velocity))
     def set_wifi_password(self, password):
-        return self.send_command_return(f'wifi ssid {password}')
+        return self.send_command_return('wifi ssid {password}')
 
     #Getter functions (receive data about the drone)
     def get_speed(self):
@@ -279,10 +312,14 @@ class BackgroundFrameRead:
         Thread(target=self.update_frame, args=()).start()
         return self
     def update_frame(self):
-        while not self.stopped:
+        while self.stopped==False:
             if not self.grabbed or not self.capture.isOpened():
                 self.stop()
             else:
                 (self.grabbed, self.frame)=self.capture.read()
     def stop(self):
         self.stopped=True
+        try:
+            self.capture.release()
+        except:
+            pass
