@@ -1,5 +1,8 @@
 # Tello Wrapper
 
+## Disclaimer
+You will experience errors when running the example. There is nothing wrong with the code, you just need to wait a few seconds. The errors are h264 decode errors and they occur because a full frame hasn't been sent through by the drone yet.
+
 ## What is this?
 This project is a wrapper around the SDK for the Tello drone. Which I am using for my projects
 
